@@ -42,6 +42,7 @@ import com.wlqq.phantom.communication.PhantomServiceManager;
 import com.wlqq.phantom.communication.IService;
 import com.wlqq.phantom.library.env.Constants;
 import com.wlqq.phantom.library.log.LogReporter;
+import com.wlqq.phantom.library.proxy.PluginClassLoader;
 import com.wlqq.phantom.library.utils.DigestUtils;
 import com.wlqq.phantom.library.utils.FileUtils;
 import com.wlqq.phantom.library.utils.IoUtils;
@@ -67,10 +68,28 @@ import java.util.Set;
  */
 @SuppressWarnings("PMD.ConfusingTernary")
 public class PluginManager {
+    // 插件 so 库目录
     private static final String LIB_DIR = "lib";
+
+    // 插件优化后的 dex 目录（Android 5.0 及以上设备）
     private static final String OAT_DIR = "oat";
+
+    // 插件优化后的 dex 目录（Android 5.0 以下设备）
     private static final String ODEX_DIR = "odex";
+
+    // 插件多 dex 目录（Android 5.0 以下设备）
+    static final String EXTRA_DEX_DIR = "ed";
+
+    // 插件优化后多 dex 目录（Android 5.0 以下设备）
+    static final String EXTRA_ODEX_DIR = "eod";
+
+    // 用于记录额外的 dex 数量（Android 5.0 以下设备）
+    static final String EXTRA_DEX_COUNT_FILE = PluginClassLoader.EXTRA_DEX_COUNT_FILE;
+
+    // 插件原始 APK 文件名
     private static final String BASE_APK = "base.apk";
+
+    // 插件优化后 DEX 文件名
     private static final String BASE_DEX = "base.dex";
 
     private static final String COMPILE_DEPENDENCIES_FILE = "compile_dependencies.txt";
@@ -362,7 +381,8 @@ public class PluginManager {
     /**
      * 安装 assets 中的插件
      *
-     * @param assetsApkPath   位于 assets 中的安装包文件路径（相对于 assets 根目录，比如：<code>"plugins/com.wlqq.phantom.plugin.test1_1.0.0.apk"</code>）
+     * @param assetsApkPath   位于 assets 中的安装包文件路径（相对于 assets 根目录，比如：
+     *                        <code>"plugins/com.wlqq.phantom.plugin.test1_1.0.0.apk"</code>）
      * @param checkVersion    是否检查版本号，若为 true, 则仅支持升级安装
      * @param checkSignatures 是否校验签名，若为 true, 则插件与宿主签名一致才能安装
      * @return 安装结果
@@ -686,13 +706,14 @@ public class PluginManager {
     @SuppressLint("PackageManagerGetSignatures")
     private Signature[] getHostSignatures() {
         if (mHostSignatures == null) {
+            final String packageName = mContext.getPackageName();
             try {
-                PackageInfo packageInfo = mContext.getPackageManager().getPackageInfo(
-                        mContext.getPackageName(), PackageManager.GET_SIGNATURES);
+                PackageInfo packageInfo = mContext.getPackageManager().getPackageInfo(packageName,
+                        PackageManager.GET_SIGNATURES);
                 mHostSignatures = packageInfo.signatures;
             } catch (PackageManager.NameNotFoundException e) {
                 // should not happen
-                e.printStackTrace();
+                VLog.w(e, "package %s not found", packageName);
             }
         }
         return mHostSignatures;
@@ -858,7 +879,7 @@ public class PluginManager {
         @NonNull
         public final Map<String, String> pluginProvidedDependencies;
 
-        public CheckSharedLibraryDependenciesResult(boolean success,
+        CheckSharedLibraryDependenciesResult(boolean success,
                 @NonNull String message,
                 @Nullable Map<String, String> hostCompileDependencies,
                 @Nullable Map<String, String> pluginProvidedDependencies) {
@@ -878,7 +899,7 @@ public class PluginManager {
         @NonNull
         public final String message;
 
-        public CheckPhantomServiceDependenciesResult(boolean success, @NonNull String message) {
+        CheckPhantomServiceDependenciesResult(boolean success, @NonNull String message) {
             this.success = success;
             this.message = message;
         }

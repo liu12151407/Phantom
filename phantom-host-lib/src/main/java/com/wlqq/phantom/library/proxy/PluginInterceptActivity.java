@@ -319,6 +319,12 @@ public class PluginInterceptActivity extends FragmentActivity {
     }
 
     @Override
+    public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions,
+            @NonNull int[] grantResults) {
+        //共享window，FragmentManager后不需要调用super方法，否则会引起一些错误
+    }
+
+    @Override
     public View findViewById(@IdRes int id) {
         return mContentProxy.getContext().findViewById(id);
     }
@@ -329,9 +335,20 @@ public class PluginInterceptActivity extends FragmentActivity {
         return mContentProxy.getContext().getCurrentFocus();
     }
 
+    /**
+     * 设置 Activity 切换动画
+     * <p>
+     * 动画资源不能放到插件中，只能使用 Android 系统提供的动画资源或将动画资源放到宿主中
+     *
+     * @param enterAnim A resource ID of the animation resource to use for the incoming activity.  Use 0 for no
+     *                  animation.
+     * @param exitAnim  A resource ID of the animation resource to use for the outgoing activity.  Use 0 for no
+     *                  animation.
+     */
+
     @Override
     public void overridePendingTransition(int enterAnim, int exitAnim) {
-        //不支持Activity切换动画，Activity的切换动画的动画资源文件必须放在宿主中
+        mContentProxy.getContext().overridePendingTransition(enterAnim, exitAnim);
     }
 
     @Override
@@ -410,9 +427,9 @@ public class PluginInterceptActivity extends FragmentActivity {
             Class viewCls;
             //android5.0及以上默认就是material风格
             if (mUseCompatTheme && Build.VERSION.SDK_INT < Build.VERSION_CODES.LOLLIPOP) {
-                viewCls = mContentProxy.getClassLoader().findClass(getCompatV7ViewClass(name));
+                viewCls = mContentProxy.getClassLoader().findClassFast(getCompatV7ViewClass(name));
             } else {
-                viewCls = mContentProxy.getClassLoader().findClass(name);
+                viewCls = mContentProxy.getClassLoader().findClassFast(name);
             }
             if (null != viewCls) {
                 Constructor<? extends View> constructor = viewCls.getConstructor(
@@ -437,9 +454,10 @@ public class PluginInterceptActivity extends FragmentActivity {
      *
      * @return true使用appcompat-v7主题，false其他主题
      */
+    @SuppressFBWarnings("REC_CATCH_EXCEPTION")
     private boolean useAppCompatTheme() {
         try {
-            Class styleCls = mContentProxy.getClassLoader().findClass("android.support.v7.appcompat.R$styleable");
+            Class styleCls = mContentProxy.getClassLoader().findClassFast("android.support.v7.appcompat.R$styleable");
             Field themeField = styleCls.getDeclaredField("AppCompatTheme");
             themeField.setAccessible(true);
             int[] compatTheme = (int[]) themeField.get(null);

@@ -80,6 +80,7 @@ public class ActivityHostProxy extends FragmentActivity implements Cloneable {
     private static final Method ON_BACK_PRESSED;
     private static final Method ON_ACTIVITY_RESULT;
     private static final Method ON_NEW_INTENT;
+    private static final Method ON_REQUEST_PERMISSIONS_RESULT;
 
     private static final Field M_FRAGMENTS;
     private static final Field M_HOST;
@@ -112,6 +113,8 @@ public class ActivityHostProxy extends FragmentActivity implements Cloneable {
         ON_ACTIVITY_RESULT = ReflectUtils.getMethod(activityClass, "onActivityResult",
                 integerClass, integerClass, intentClass);
         ON_NEW_INTENT = ReflectUtils.getMethod(activityClass, "onNewIntent", intentClass);
+        ON_REQUEST_PERMISSIONS_RESULT = ReflectUtils.getMethod(activityClass, "onRequestPermissionsResult",
+                int.class, String[].class, int[].class);
 
         M_FRAGMENTS = ReflectUtils.getField(FragmentActivity.class, "mFragments");
         M_HOST = ReflectUtils.getField(FragmentController.class, "mHost");
@@ -333,7 +336,8 @@ public class ActivityHostProxy extends FragmentActivity implements Cloneable {
             shadow.useHostTheme();
             return shadow;
         } catch (CloneNotSupportedException e) {
-            e.printStackTrace();
+            VLog.w(e, "clone ActivityHostProxy exception");
+
             String msg = String.format("proxy %s for plugin activity %s cannot clone",
                     this.getClass().getSimpleName(), mPluginComponentName);
             HashMap<String, Object> params = new HashMap<>(1);
@@ -612,12 +616,6 @@ public class ActivityHostProxy extends FragmentActivity implements Cloneable {
         return super.bindService(setPluginServiceFlag(service), conn, flags);
     }
 
-
-    @SuppressWarnings("PMD.UncommentedEmptyMethodBody")
-    @Override
-    public void overridePendingTransition(int enterAnim, int exitAnim) {
-    }
-
     @Override
     protected void onSaveInstanceState(Bundle outState) {
         super.onSaveInstanceState(outState);
@@ -736,7 +734,7 @@ public class ActivityHostProxy extends FragmentActivity implements Cloneable {
         try {
             return getFragmentManager().popBackStackImmediate();
         } catch (IllegalStateException e) {
-            e.printStackTrace();
+            VLog.w(e, "FragmentManager#popBackStackImmediate exception");
         }
 
         return true;
@@ -749,6 +747,15 @@ public class ActivityHostProxy extends FragmentActivity implements Cloneable {
         }
         super.onActivityResult(requestCode, resultCode, data);
         callTargetActivityMethod(ON_ACTIVITY_RESULT, "onActivityResult", requestCode, resultCode, data);
+    }
+
+    @Override
+    public void onRequestPermissionsResult(int requestCode,
+            @NonNull String[] permissions,
+            @NonNull int[] grantResults) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults);
+        callTargetActivityMethod(ON_REQUEST_PERMISSIONS_RESULT, "onRequestPermissionsResult",
+                requestCode, permissions, grantResults);
     }
 
     private Object callTargetActivityMethod(Method method, String methodName, Object... args) {
